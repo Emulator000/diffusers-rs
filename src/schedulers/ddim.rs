@@ -62,8 +62,10 @@ impl DDIMScheduler {
     /// during training.
     pub fn new(inference_steps: usize, config: DDIMSchedulerConfig) -> Self {
         let step_ratio = config.train_timesteps / inference_steps;
-        let timesteps: Vec<usize> =
-            (0..(inference_steps)).map(|s| s * step_ratio + config.steps_offset).rev().collect();
+        let timesteps: Vec<usize> = (0..(inference_steps))
+            .map(|s| s * step_ratio + config.steps_offset)
+            .rev()
+            .collect();
         let betas = match config.beta_schedule {
             BetaSchedule::ScaledLinear => Tensor::linspace(
                 config.beta_start.sqrt(),
@@ -81,8 +83,14 @@ impl DDIMScheduler {
             BetaSchedule::SquaredcosCapV2 => betas_for_alpha_bar(config.train_timesteps, 0.999),
         };
         let alphas: Tensor = 1.0 - betas;
-        let alphas_cumprod = Vec::<f64>::from(alphas.cumprod(0, Kind::Double));
-        Self { alphas_cumprod, timesteps, step_ratio, init_noise_sigma: 1., config }
+        let alphas_cumprod = Vec::<f64>::try_from(alphas.cumprod(0, Kind::Double)).unwrap();
+        Self {
+            alphas_cumprod,
+            timesteps,
+            step_ratio,
+            init_noise_sigma: 1.,
+            config,
+        }
     }
 
     pub fn timesteps(&self) -> &[usize] {
@@ -97,9 +105,17 @@ impl DDIMScheduler {
 
     /// Performs a backward step during inference.
     pub fn step(&self, model_output: &Tensor, timestep: usize, sample: &Tensor) -> Tensor {
-        let timestep = if timestep >= self.alphas_cumprod.len() { timestep - 1 } else { timestep };
+        let timestep = if timestep >= self.alphas_cumprod.len() {
+            timestep - 1
+        } else {
+            timestep
+        };
         // https://github.com/huggingface/diffusers/blob/6e099e2c8ce4c4f5c7318e970a8c093dc5c7046e/src/diffusers/schedulers/scheduling_ddim.py#L195
-        let prev_timestep = if timestep > self.step_ratio { timestep - self.step_ratio } else { 0 };
+        let prev_timestep = if timestep > self.step_ratio {
+            timestep - self.step_ratio
+        } else {
+            0
+        };
 
         let alpha_prod_t = self.alphas_cumprod[timestep];
         let alpha_prod_t_prev = self.alphas_cumprod[prev_timestep];
@@ -140,7 +156,11 @@ impl DDIMScheduler {
     }
 
     pub fn add_noise(&self, original: &Tensor, noise: Tensor, timestep: usize) -> Tensor {
-        let timestep = if timestep >= self.alphas_cumprod.len() { timestep - 1 } else { timestep };
+        let timestep = if timestep >= self.alphas_cumprod.len() {
+            timestep - 1
+        } else {
+            timestep
+        };
         let sqrt_alpha_prod = self.alphas_cumprod[timestep].sqrt();
         let sqrt_one_minus_alpha_prod = (1.0 - self.alphas_cumprod[timestep]).sqrt();
         sqrt_alpha_prod * original + sqrt_one_minus_alpha_prod * noise

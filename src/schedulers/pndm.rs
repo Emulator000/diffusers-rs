@@ -72,23 +72,31 @@ impl PNDMScheduler {
 
         // &betas to avoid moving it
         let alphas: Tensor = 1. - betas;
-        let alphas_cumprod = Vec::<f64>::from(alphas.cumprod(0, Kind::Double));
+        let alphas_cumprod = Vec::<f64>::try_from(alphas.cumprod(0, Kind::Double)).unwrap();
 
-        let final_alpha_cumprod = if config.set_alpha_to_one { 1.0 } else { alphas_cumprod[0] };
+        let final_alpha_cumprod = if config.set_alpha_to_one {
+            1.0
+        } else {
+            alphas_cumprod[0]
+        };
         // creates integer timesteps by multiplying by ratio
         // casting to int to avoid issues when num_inference_step is power of 3
         let step_ratio = config.train_timesteps / inference_steps;
-        let timesteps: Vec<usize> =
-            (0..(inference_steps)).map(|s| s * step_ratio + config.steps_offset).collect();
+        let timesteps: Vec<usize> = (0..(inference_steps))
+            .map(|s| s * step_ratio + config.steps_offset)
+            .collect();
 
         let n_ts = timesteps.len();
         // https://github.com/huggingface/diffusers/blob/8f581591598255eff72cce8858f365eace47481f/src/diffusers/schedulers/scheduling_pndm.py#L173
-        let plms_timesteps =
-            [&timesteps[..n_ts - 2], &[timesteps[n_ts - 2]], &timesteps[n_ts - 2..]]
-                .concat()
-                .into_iter()
-                .rev()
-                .collect();
+        let plms_timesteps = [
+            &timesteps[..n_ts - 2],
+            &[timesteps[n_ts - 2]],
+            &timesteps[n_ts - 2..],
+        ]
+        .concat()
+        .into_iter()
+        .rev()
+        .collect();
 
         Self {
             alphas_cumprod,
@@ -215,7 +223,11 @@ impl PNDMScheduler {
     }
 
     pub fn add_noise(&self, original: &Tensor, noise: Tensor, timestep: usize) -> Tensor {
-        let timestep = if timestep >= self.alphas_cumprod.len() { timestep - 1 } else { timestep };
+        let timestep = if timestep >= self.alphas_cumprod.len() {
+            timestep - 1
+        } else {
+            timestep
+        };
         let sqrt_alpha_prod = self.alphas_cumprod[timestep].sqrt();
         let sqrt_one_minus_alpha_prod = (1.0 - self.alphas_cumprod[timestep]).sqrt();
         // noisy samples

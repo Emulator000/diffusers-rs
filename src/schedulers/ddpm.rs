@@ -78,7 +78,7 @@ impl DDPMScheduler {
 
         // &betas to avoid moving it
         let alphas: Tensor = 1. - betas;
-        let alphas_cumprod = Vec::<f64>::from(alphas.cumprod(0, Kind::Double));
+        let alphas_cumprod = Vec::<f64>::try_from(alphas.cumprod(0, Kind::Double)).unwrap();
 
         // min(train_timesteps, inference_steps)
         // https://github.com/huggingface/diffusers/blob/8331da46837be40f96fbd24de6a6fb2da28acd11/src/diffusers/schedulers/scheduling_ddpm.py#L187
@@ -87,14 +87,23 @@ impl DDPMScheduler {
         let step_ratio = config.train_timesteps / inference_steps;
         let timesteps: Vec<usize> = (0..inference_steps).map(|s| s * step_ratio).rev().collect();
 
-        Self { alphas_cumprod, init_noise_sigma: 1.0, timesteps, step_ratio, config }
+        Self {
+            alphas_cumprod,
+            init_noise_sigma: 1.0,
+            timesteps,
+            step_ratio,
+            config,
+        }
     }
 
     fn get_variance(&self, timestep: usize) -> f64 {
         let prev_t = timestep as isize - self.step_ratio as isize;
         let alpha_prod_t = self.alphas_cumprod[timestep];
-        let alpha_prod_t_prev =
-            if prev_t >= 0 { self.alphas_cumprod[prev_t as usize] } else { 1.0 };
+        let alpha_prod_t_prev = if prev_t >= 0 {
+            self.alphas_cumprod[prev_t as usize]
+        } else {
+            1.0
+        };
         let current_beta_t = 1. - alpha_prod_t / alpha_prod_t_prev;
 
         // For t > 0, compute predicted variance βt (see formula (6) and (7) from https://arxiv.org/pdf/2006.11239.pdf)
@@ -132,8 +141,11 @@ impl DDPMScheduler {
         // https://github.com/huggingface/diffusers/blob/df2b548e893ccb8a888467c2508756680df22821/src/diffusers/schedulers/scheduling_ddpm.py#L272
         // 1. compute alphas, betas
         let alpha_prod_t = self.alphas_cumprod[timestep];
-        let alpha_prod_t_prev =
-            if prev_t >= 0 { self.alphas_cumprod[prev_t as usize] } else { 1.0 };
+        let alpha_prod_t_prev = if prev_t >= 0 {
+            self.alphas_cumprod[prev_t as usize]
+        } else {
+            1.0
+        };
         let beta_prod_t = 1. - alpha_prod_t;
         let beta_prod_t_prev = 1. - alpha_prod_t_prev;
         let current_alpha_t = alpha_prod_t / alpha_prod_t_prev;

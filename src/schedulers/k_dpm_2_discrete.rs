@@ -98,7 +98,7 @@ impl KDPM2DiscreteScheduler {
             0,
         );
 
-        let init_noise_sigma: f64 = sigmas.max().into();
+        let init_noise_sigma: f64 = sigmas.max().try_into().unwrap();
 
         // interpolate timesteps
         let timesteps_interpol = Self::sigma_to_t(&sigmas_interpol, log_sigmas);
@@ -119,7 +119,9 @@ impl KDPM2DiscreteScheduler {
                 // sigmas_interpol[:1]
                 sigmas_interpol.i(..1),
                 // sigmas_interpol[1:].repeat_interleave(2)
-                sigmas_interpol.i(1..).repeat_interleave_self_int(2, 0, None),
+                sigmas_interpol
+                    .i(1..)
+                    .repeat_interleave_self_int(2, 0, None),
                 //sigmas_interpol[-1:]
                 sigmas_interpol.i(-1..0),
             ],
@@ -136,9 +138,9 @@ impl KDPM2DiscreteScheduler {
         );
 
         Self {
-            timesteps: timesteps.into(),
-            sigmas: sigmas.into(),
-            sigmas_interpol: sigmas_interpol.into(),
+            timesteps: timesteps.try_into().unwrap(),
+            sigmas: sigmas.try_into().unwrap(),
+            sigmas_interpol: sigmas_interpol.try_into().unwrap(),
             init_noise_sigma,
             sample: None,
             config,
@@ -235,7 +237,11 @@ impl KDPM2DiscreteScheduler {
         let sigma_hat = sigma * (gamma + 1.); // sigma_hat == sigma for now
 
         // 1. compute predicted original sample (x_0) from sigma-scaled predicted noise
-        let sigma_input = if self.state_in_first_order() { sigma_hat } else { sigma_interpol };
+        let sigma_input = if self.state_in_first_order() {
+            sigma_hat
+        } else {
+            sigma_interpol
+        };
         let pred_original_sample = match self.config.prediction_type {
             PredictionType::Epsilon => sample - sigma_input * model_output,
             PredictionType::VPrediction => {

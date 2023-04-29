@@ -17,9 +17,15 @@ pub struct DeviceSetup {
 
 impl DeviceSetup {
     pub fn new(cpu: Vec<String>) -> Self {
-        let accelerator_device =
-            if tch::utils::has_mps() { Device::Mps } else { Device::cuda_if_available() };
-        Self { accelerator_device, cpu }
+        let accelerator_device = if tch::utils::has_mps() {
+            Device::Mps
+        } else {
+            Device::cuda_if_available()
+        };
+        Self {
+            accelerator_device,
+            cpu,
+        }
     }
 
     pub fn get(&self, name: &str) -> Device {

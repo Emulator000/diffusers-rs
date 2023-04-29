@@ -125,13 +125,15 @@ impl DPMSolverMultistepScheduler {
 
         // creates a vector of `solver_order` empty tensors
         // https://github.com/huggingface/diffusers/blob/e4fe9413121b78c4c1f109b50f0f3cc1c320a1a2/src/diffusers/schedulers/scheduling_dpmsolver_multistep.py#L206-L208
-        let model_outputs = iter::repeat_with(Tensor::new).take(config.solver_order).collect();
+        let model_outputs = iter::repeat_with(Tensor::new)
+            .take(config.solver_order)
+            .collect();
 
         Self {
-            alphas_cumprod: alphas_cumprod.into(),
-            alpha_t: alpha_t.into(),
-            sigma_t: sigma_t.into(),
-            lambda_t: lambda_t.into(),
+            alphas_cumprod: alphas_cumprod.try_into().unwrap(),
+            alpha_t: alpha_t.try_into().unwrap(),
+            sigma_t: sigma_t.try_into().unwrap(),
+            lambda_t: lambda_t.try_into().unwrap(),
             init_noise_sigma: 1.,
             lower_order_nums: 0,
             model_outputs,
@@ -171,8 +173,10 @@ impl DPMSolverMultistepScheduler {
                 };
                 if self.config.thresholding {
                     // Dynamic thresholding in https://arxiv.org/abs/2205.11487
-                    let dynamic_max_val =
-                        x0_pred.abs().reshape(&[x0_pred.size()[0], -1]).quantile_scalar(
+                    let dynamic_max_val = x0_pred
+                        .abs()
+                        .reshape(&[x0_pred.size()[0], -1])
+                        .quantile_scalar(
                             self.config.dynamic_thresholding_ratio,
                             1,
                             false,
@@ -308,11 +312,19 @@ impl DPMSolverMultistepScheduler {
             model_output_list[model_output_list.len() - 2].as_ref(),
             model_output_list[model_output_list.len() - 3].as_ref(),
         );
-        let (lambda_t, lambda_s0, lambda_s1, lambda_s2) =
-            (self.lambda_t[t], self.lambda_t[s0], self.lambda_t[s1], self.lambda_t[s2]);
+        let (lambda_t, lambda_s0, lambda_s1, lambda_s2) = (
+            self.lambda_t[t],
+            self.lambda_t[s0],
+            self.lambda_t[s1],
+            self.lambda_t[s2],
+        );
         let (alpha_t, alpha_s0) = (self.alpha_t[t], self.alpha_t[s0]);
         let (sigma_t, sigma_s0) = (self.sigma_t[t], self.sigma_t[s0]);
-        let (h, h_0, h_1) = (lambda_t - lambda_s0, lambda_s0 - lambda_s1, lambda_s1 - lambda_s2);
+        let (h, h_0, h_1) = (
+            lambda_t - lambda_s0,
+            lambda_s0 - lambda_s1,
+            lambda_s1 - lambda_s2,
+        );
         let (r0, r1) = (h_0 / h, h_1 / h);
         let d0 = m0;
         let (d1_0, d1_1) = ((1.0 / r0) * (m0 - m1), (1.0 / r1) * (m1 - m2));
@@ -349,8 +361,11 @@ impl DPMSolverMultistepScheduler {
         // https://github.com/huggingface/diffusers/blob/e4fe9413121b78c4c1f109b50f0f3cc1c320a1a2/src/diffusers/schedulers/scheduling_dpmsolver_multistep.py#L457
         let step_index = self.timesteps.iter().position(|&t| t == timestep).unwrap();
 
-        let prev_timestep =
-            if step_index == self.timesteps.len() - 1 { 0 } else { self.timesteps[step_index + 1] };
+        let prev_timestep = if step_index == self.timesteps.len() - 1 {
+            0
+        } else {
+            self.timesteps[step_index + 1]
+        };
         let lower_order_final = (step_index == self.timesteps.len() - 1)
             && self.config.lower_order_final
             && self.timesteps.len() < 15;
@@ -380,8 +395,11 @@ impl DPMSolverMultistepScheduler {
                 sample,
             )
         } else {
-            let timestep_list =
-                [self.timesteps[step_index - 2], self.timesteps[step_index - 1], timestep];
+            let timestep_list = [
+                self.timesteps[step_index - 2],
+                self.timesteps[step_index - 1],
+                timestep,
+            ];
             self.multistep_dpm_solver_third_order_update(
                 &self.model_outputs,
                 timestep_list,

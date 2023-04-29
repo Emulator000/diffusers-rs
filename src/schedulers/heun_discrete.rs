@@ -88,7 +88,7 @@ impl HeunDiscreteScheduler {
             0,
         );
 
-        let init_noise_sigma: f64 = sigmas.max().into();
+        let init_noise_sigma: f64 = sigmas.max().try_into().unwrap();
 
         // https://github.com/huggingface/diffusers/blob/aba2a65d6ab47c0d1c12fa47e9b238c1d3e34512/src/diffusers/schedulers/scheduling_heun_discrete.py#L140
         let timesteps = Tensor::cat(
@@ -102,8 +102,8 @@ impl HeunDiscreteScheduler {
         );
 
         Self {
-            timesteps: timesteps.into(),
-            sigmas: sigmas.into(),
+            timesteps: timesteps.try_into().unwrap(),
+            sigmas: sigmas.try_into().unwrap(),
             prev_derivative: None,
             dt: None,
             sample: None,
@@ -163,7 +163,11 @@ impl HeunDiscreteScheduler {
         let sigma_hat = sigma * (gamma + 1.); // sigma_hat == sigma for now
 
         // 1. compute predicted original sample (x_0) from sigma-scaled predicted noise
-        let sigma_input = if self.state_in_first_order() { sigma_hat } else { sigma_next };
+        let sigma_input = if self.state_in_first_order() {
+            sigma_hat
+        } else {
+            sigma_next
+        };
 
         let pred_original_sample = match self.config.prediction_type {
             PredictionType::Epsilon => sample - sigma_input * model_output,

@@ -133,7 +133,9 @@ impl KDPM2AncestralDiscreteScheduler {
                 // sigmas_interpol[:1]
                 sigmas_interpol.i(..1),
                 // sigmas_interpol[1:].repeat_interleave(2)
-                sigmas_interpol.i(1..).repeat_interleave_self_int(2, 0, None),
+                sigmas_interpol
+                    .i(1..)
+                    .repeat_interleave_self_int(2, 0, None),
                 //sigmas_interpol[-1:]
                 sigmas_interpol.i(-1..0),
             ],
@@ -174,14 +176,14 @@ impl KDPM2AncestralDiscreteScheduler {
         );
 
         // standard deviation of the initial noise distribution
-        let init_noise_sigma: f64 = sigmas.max().into();
+        let init_noise_sigma: f64 = sigmas.max().try_into().unwrap();
 
         Self {
-            timesteps: timesteps.into(),
-            sigmas: sigmas.into(),
-            sigmas_interpol: sigmas_interpol.into(),
-            sigmas_up: sigmas_up.into(),
-            sigmas_down: sigmas_down.into(),
+            timesteps: timesteps.try_into().unwrap(),
+            sigmas: sigmas.try_into().unwrap(),
+            sigmas_interpol: sigmas_interpol.try_into().unwrap(),
+            sigmas_up: sigmas_up.try_into().unwrap(),
+            sigmas_down: sigmas_down.try_into().unwrap(),
             init_noise_sigma,
             sample: None,
             config,
@@ -239,8 +241,11 @@ impl KDPM2AncestralDiscreteScheduler {
     /// Scales model input by (sigma^2 + 1) ^ .5
     pub fn scale_model_input(&self, sample: Tensor, timestep: f64) -> Tensor {
         let step_index = self.index_for_timestep(timestep);
-        let step_index_minus_one =
-            if step_index == 0 { self.sigmas.len() - 1 } else { step_index - 1 };
+        let step_index_minus_one = if step_index == 0 {
+            self.sigmas.len() - 1
+        } else {
+            step_index - 1
+        };
 
         let sigma = if self.state_in_first_order() {
             self.sigmas[step_index]
@@ -257,8 +262,11 @@ impl KDPM2AncestralDiscreteScheduler {
 
     pub fn step(&mut self, model_output: &Tensor, timestep: f64, sample: &Tensor) -> Tensor {
         let step_index = self.index_for_timestep(timestep);
-        let step_index_minus_one =
-            if step_index == 0 { self.sigmas.len() - 1 } else { step_index - 1 };
+        let step_index_minus_one = if step_index == 0 {
+            self.sigmas.len() - 1
+        } else {
+            step_index - 1
+        };
 
         let (sigma, sigma_interpol, sigma_up, sigma_down) = if self.state_in_first_order() {
             (
@@ -286,7 +294,11 @@ impl KDPM2AncestralDiscreteScheduler {
         let noise = model_output.randn_like();
 
         // 1. compute predicted original sample (x_0) from sigma-scaled predicted noise
-        let sigma_input = if self.state_in_first_order() { sigma_hat } else { sigma_interpol };
+        let sigma_input = if self.state_in_first_order() {
+            sigma_hat
+        } else {
+            sigma_interpol
+        };
         let pred_original_sample = match self.config.prediction_type {
             PredictionType::Epsilon => sample - sigma_input * model_output,
             PredictionType::VPrediction => {

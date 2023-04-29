@@ -80,11 +80,11 @@ impl LMSDiscreteScheduler {
         let sigmas = Tensor::concat(&[sigmas, Tensor::of_slice(&[0.0])], 0);
 
         // standard deviation of the initial noise distribution
-        let init_noise_sigma: f64 = sigmas.max().into();
+        let init_noise_sigma: f64 = sigmas.max().try_into().unwrap();
 
         Self {
-            timesteps: timesteps.into(),
-            sigmas: sigmas.into(),
+            timesteps: timesteps.try_into().unwrap(),
+            sigmas: sigmas.try_into().unwrap(),
             init_noise_sigma,
             derivatives: vec![],
             config,
@@ -152,8 +152,9 @@ impl LMSDiscreteScheduler {
 
         // 3. compute linear multistep coefficients
         let order = self.config.order.min(step_index + 1);
-        let lms_coeffs: Vec<_> =
-            (0..order).map(|o| self.get_lms_coefficient(order, step_index, o)).collect();
+        let lms_coeffs: Vec<_> = (0..order)
+            .map(|o| self.get_lms_coefficient(order, step_index, o))
+            .collect();
 
         // 4. compute previous sample based on the derivatives path
         // https://github.com/huggingface/diffusers/blob/769f0be8fb41daca9f3cbcffcfd0dbf01cc194b8/src/diffusers/schedulers/scheduling_lms_discrete.py#L243-L245
